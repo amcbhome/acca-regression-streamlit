@@ -173,16 +173,25 @@ with tabs[1]:
 
     st.divider()
 
-    st.markdown("### Regression formulae")
+    st.markdown("### Regression and correlation formulae")
 
+    # Regression equation
     st.latex(r"y = a + bx")
 
+    # Slope
     st.latex(
         r"b = \frac{\sum (x - \bar{x})(y - \bar{y})}"
         r"{\sum (x - \bar{x})^2}"
     )
 
+    # Intercept
     st.latex(r"a = \bar{y} - b\bar{x}")
+
+    # Correlation coefficient
+    st.latex(
+        r"r = \frac{\sum (x - \bar{x})(y - \bar{y})}"
+        r"{\sqrt{\sum (x - \bar{x})^2 \sum (y - \bar{y})^2}}"
+    )
 
 # ====================================================
 # TAB 3 — OUTPUT
