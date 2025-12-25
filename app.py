@@ -114,7 +114,7 @@ st.divider()
 tabs = st.tabs(["Calculate", "Data table", "Correlation"])
 
 # ====================================================
-# TAB 1 — CALCULATE (live slider + Altair chart)
+# TAB 1 — CALCULATE
 # ====================================================
 with tabs[0]:
     st.subheader("Calculate")
@@ -137,7 +137,7 @@ with tabs[0]:
 
     y_pred = a + b * x_val
 
-    st.metric("Predicted total cost y ($000)", f"{y_pred:,.2f}")
+    st.metric("Predicted total cost (£000)", f"£{y_pred:,.2f}")
 
     # -----------------------------
     # Altair interactive chart
@@ -153,7 +153,7 @@ with tabs[0]:
 
     scatter = alt.Chart(scatter_df).mark_circle(size=70).encode(
         x=alt.X("x", title="Activity level (000 units)"),
-        y=alt.Y("y", title="Total cost ($000)"),
+        y=alt.Y("y", title="Total cost (£000)"),
         tooltip=["x", "y"],
     )
 
@@ -177,7 +177,7 @@ with tabs[0]:
     st.caption(f"Regression model: **y = {a:.2f} + {b:.2f}x**")
 
 # ====================================================
-# TAB 2 — DATA TABLE (edit / upload)
+# TAB 2 — DATA TABLE
 # ====================================================
 with tabs[1]:
     st.subheader("Data table")
@@ -198,29 +198,39 @@ with tabs[1]:
         hide_index=True,
         column_config={
             "x": st.column_config.NumberColumn("x (000 units)", step=1),
-            "y": st.column_config.NumberColumn("y ($000)", step=1),
+            "y": st.column_config.NumberColumn("y (£000)", step=1),
         },
     )
 
     st.session_state.df = edited
 
 # ====================================================
-# TAB 3 — CORRELATION + FORMULAS
+# TAB 3 — CORRELATION & INTERPRETATION
 # ====================================================
 with tabs[2]:
-    st.subheader("Correlation & calculations")
+    st.subheader("Correlation & interpretation")
 
     df = clean_xy(st.session_state.df)
     a, b, r, r2 = fit_regression(df)
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Correlation (r)", f"{r:.3f}")
-    c2.metric("r²", f"{r2:.3f}")
+    c2.metric("Coefficient of determination (r²)", f"{r2:.3f}")
     c3.metric("Regression", f"y = {a:.2f} + {b:.2f}x")
 
+    variance_pct = r2 * 100
+
     st.write(
-        "Correlation (**r**) measures the strength of the linear relationship. "
-        "**r²** estimates the proportion of variation in **y** explained by **x**."
+        f"""
+        **Interpretation**
+
+        The coefficient of determination (**r²**) indicates that approximately
+        **{variance_pct:.1f}% of the variance in total cost (£y)** is explained by
+        changes in the activity level (**x**).
+
+        This suggests a **strong linear relationship**, making the regression model
+        suitable for forecasting and budgeting purposes within the observed data range.
+        """
     )
 
     with st.expander("Show calculations and formulas"):
@@ -273,5 +283,5 @@ with tabs[2]:
 st.divider()
 st.caption(
     "Portfolio demo: operationalising the ACCA PM regression example into a mobile-ready predictive analytics app. "
-    "Designed for transparency, editability, and business deployment."
+    "Currency shown in GBP (£)."
 )
