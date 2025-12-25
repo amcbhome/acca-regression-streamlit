@@ -44,7 +44,7 @@ st.caption(
 )
 
 # ----------------------------------------------------
-# Default ACCA dataset
+# Default dataset
 # ----------------------------------------------------
 DEFAULT_DF = pd.DataFrame(
     {
@@ -54,7 +54,7 @@ DEFAULT_DF = pd.DataFrame(
 )
 
 # ----------------------------------------------------
-# Helper functions
+# Helpers
 # ----------------------------------------------------
 def clean_xy(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -71,8 +71,8 @@ def clean_xy(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def fit_regression(df: pd.DataFrame):
-    x = df["x"].to_numpy(dtype=float)
-    y = df["y"].to_numpy(dtype=float)
+    x = df["x"].to_numpy(float)
+    y = df["y"].to_numpy(float)
 
     x_bar = x.mean()
     y_bar = y.mean()
@@ -81,7 +81,7 @@ def fit_regression(df: pd.DataFrame):
     a = y_bar - b * x_bar
 
     r, _ = pearsonr(x, y)
-    r2 = r ** 2
+    r2 = r**2
 
     return a, b, r, r2
 
@@ -93,7 +93,7 @@ if "df" not in st.session_state:
     st.session_state.df = DEFAULT_DF.copy()
 
 # ----------------------------------------------------
-# Global controls
+# Controls
 # ----------------------------------------------------
 col1, col2 = st.columns(2)
 with col1:
@@ -112,26 +112,21 @@ with col2:
 st.divider()
 
 # ----------------------------------------------------
-# Tabs (Input → Correlation → Output)
+# Tabs
 # ----------------------------------------------------
 tabs = st.tabs(["Input", "Correlation", "Output"])
 
 # ====================================================
-# TAB 1 — INPUT
+# INPUT
 # ====================================================
 with tabs[0]:
     st.subheader("Input")
 
-    uploaded = st.file_uploader("Upload CSV (columns: x, y)", type=["csv"])
+    uploaded = st.file_uploader("Upload CSV (x, y)", type=["csv"])
     if uploaded is not None:
-        try:
-            up_df = pd.read_csv(uploaded)
-            st.session_state.df = clean_xy(up_df)
-            st.success("CSV loaded successfully.")
-        except Exception as e:
-            st.error(str(e))
+        st.session_state.df = clean_xy(pd.read_csv(uploaded))
 
-    edited = st.data_editor(
+    st.session_state.df = st.data_editor(
         st.session_state.df,
         num_rows="dynamic",
         use_container_width=True,
@@ -142,15 +137,8 @@ with tabs[0]:
         },
     )
 
-    st.session_state.df = edited
-
-    st.caption(
-        "Edit the input data directly or upload a new dataset. "
-        "Ensure units remain consistent."
-    )
-
 # ====================================================
-# TAB 2 — CORRELATION
+# CORRELATION
 # ====================================================
 with tabs[1]:
     st.subheader("Correlation & interpretation")
@@ -158,36 +146,20 @@ with tabs[1]:
     df = clean_xy(st.session_state.df)
     a, b, r, r2 = fit_regression(df)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Correlation (r)", f"{r:.3f}")
-    c2.metric("Coefficient of determination (r²)", f"{r2:.3f}")
-    c3.metric("Regression", f"y = {a:.2f} + {b:.2f}x")
-
-    variance_pct = r2 * 100
+    st.metric("Correlation (r)", f"{r:.3f}")
+    st.metric("Coefficient of determination (r²)", f"{r2:.3f}")
 
     st.write(
         f"""
         **Interpretation**
 
-        The coefficient of determination (**r²**) indicates that approximately
-        **{variance_pct:.1f}% of the variance in total cost (£y)** is explained by
-        changes in activity (**x**).
-
-        This represents a **strong linear relationship**, supporting the use of the
-        regression model for forecasting and budgeting within the relevant range.
+        Approximately **{r2*100:.1f}% of the variance in cost** is explained by
+        changes in activity level, indicating a strong linear relationship.
         """
     )
 
-    with st.expander("Show formulas"):
-        st.latex(r"y = a + bx")
-        st.latex(
-            r"b = \frac{\sum (x - \bar{x})(y - \bar{y})}"
-            r"{\sum (x - \bar{x})^2}"
-        )
-        st.latex(r"a = \bar{y} - b\bar{x}")
-
 # ====================================================
-# TAB 3 — OUTPUT
+# OUTPUT
 # ====================================================
 with tabs[2]:
     st.subheader("Output")
@@ -195,77 +167,35 @@ with tabs[2]:
     df = clean_xy(st.session_state.df)
     a, b, r, r2 = fit_regression(df)
 
-    left, right = st.columns([1, 2], vertical_alignment="center")
+    left, right = st.columns([1, 2])
 
     with left:
-        st.markdown("**Activity**")
-        x_val = st.slider(
-            "",
-            min_value=0,
-            max_value=100,
-            value=50,
-            orientation="vertical",
-        )
+        st.markdown("**Activity (0–100)**")
+        x_val = st.slider("", min_value=0, max_value=100, value=50)
 
-    y_pred = a + b * float(x_val)
+    y_pred = a + b * x_val
 
     with right:
         st.markdown("**Cost (dynamic)**")
         st.markdown(
-            f"""
-            <div style="
-                font-size:2.3rem;
-                font-weight:700;
-                margin-top:10px;
-            ">
-                £{y_pred:,.0f}k
-            </div>
-            """,
+            f"<div style='font-size:2.3rem;font-weight:700;'>£{y_pred:,.0f}k</div>",
             unsafe_allow_html=True,
         )
         st.caption(f"Model input: x = {x_val}")
 
     st.divider()
 
-    # Chart context
+    # Chart
     line_df = pd.DataFrame({"x": np.linspace(0, 100, 200)})
     line_df["y"] = a + b * line_df["x"]
 
     point_df = pd.DataFrame({"x": [x_val], "y": [y_pred]})
 
-    scatter = alt.Chart(df).mark_circle(size=70).encode(
-        x=alt.X("x", title="Activity (x)"),
-        y=alt.Y("y", title="Cost (£000)"),
-        tooltip=["x", "y"],
-    )
-
-    line = alt.Chart(line_df).mark_line(color="orange").encode(
-        x="x",
-        y="y",
-    )
-
-    point = alt.Chart(point_df).mark_circle(
-        size=180, color="red"
-    ).encode(
-        x="x",
-        y="y",
-        tooltip=[
-            alt.Tooltip("x:Q", title="Activity"),
-            alt.Tooltip("y:Q", title="Predicted cost (£000)", format=",.2f"),
-        ],
-    )
-
     st.altair_chart(
-        scatter + line + point,
+        alt.Chart(df).mark_circle(size=70).encode(x="x", y="y")
+        + alt.Chart(line_df).mark_line(color="orange").encode(x="x", y="y")
+        + alt.Chart(point_df).mark_circle(size=180, color="red").encode(x="x", y="y"),
         use_container_width=True,
     )
 
-    st.caption(
-        f"Regression model: **y = {a:.2f} + {b:.2f}x** · r² = {r2:.2f}"
-    )
-
-st.divider()
-st.caption(
-    "Portfolio demo: linear regression applied to cost behaviour analysis. "
-    "Designed for mobile use and business decision-making."
-)
+    st.caption(f"Regression model: y = {a:.2f} + {b:.2f}x")
