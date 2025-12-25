@@ -5,7 +5,7 @@ import altair as alt
 from scipy.stats import pearsonr
 
 # ----------------------------------------------------
-# App configuration (mobile-first)
+# App configuration
 # ----------------------------------------------------
 st.set_page_config(
     page_title="Predictive Cost Model",
@@ -40,7 +40,7 @@ st.markdown(
 )
 
 st.caption(
-    "A mobile-friendly regression app based on the ACCA PM (F5) regression example."
+    "A mobile-friendly regression app aligned to the ACCA PM (F5) regression example."
 )
 
 # ----------------------------------------------------
@@ -66,7 +66,7 @@ def clean_xy(df: pd.DataFrame) -> pd.DataFrame:
     df["y"] = pd.to_numeric(df["y"], errors="coerce")
     df = df.dropna().sort_values("x").reset_index(drop=True)
     if len(df) < 2:
-        raise ValueError("At least two (x, y) observations are required.")
+        raise ValueError("At least two observations are required.")
     return df
 
 
@@ -81,7 +81,7 @@ def fit_regression(df: pd.DataFrame):
     a = y_bar - b * x_bar
 
     r, _ = pearsonr(x, y)
-    r2 = r**2
+    r2 = r ** 2
 
     return a, b, r, r2
 
@@ -93,7 +93,7 @@ if "df" not in st.session_state:
     st.session_state.df = DEFAULT_DF.copy()
 
 # ----------------------------------------------------
-# Controls
+# Global controls
 # ----------------------------------------------------
 col1, col2 = st.columns(2)
 with col1:
@@ -111,76 +111,16 @@ with col2:
 
 st.divider()
 
-tabs = st.tabs(["Calculate", "Data table", "Correlation"])
+# ----------------------------------------------------
+# Tabs (Input → Correlation → Output)
+# ----------------------------------------------------
+tabs = st.tabs(["Input", "Correlation", "Output"])
 
 # ====================================================
-# TAB 1 — CALCULATE
+# TAB 1 — INPUT
 # ====================================================
 with tabs[0]:
-    st.subheader("Calculate")
-
-    df = clean_xy(st.session_state.df)
-    a, b, r, r2 = fit_regression(df)
-
-    x_min = float(df["x"].min())
-    x_max = float(df["x"].max())
-
-    step = 1.0 if np.allclose(df["x"] % 1, 0) else 0.1
-
-    x_val = st.slider(
-        "Activity level x (000 units)",
-        min_value=x_min,
-        max_value=x_max,
-        value=float(df["x"].median()),
-        step=step,
-    )
-
-    y_pred = a + b * x_val
-
-    st.metric("Predicted total cost (£000)", f"£{y_pred:,.2f}")
-
-    # -----------------------------
-    # Altair interactive chart
-    # -----------------------------
-    scatter_df = df.copy()
-
-    line_df = pd.DataFrame(
-        {"x": np.linspace(x_min, x_max, 200)}
-    )
-    line_df["y"] = a + b * line_df["x"]
-
-    point_df = pd.DataFrame({"x": [x_val], "y": [y_pred]})
-
-    scatter = alt.Chart(scatter_df).mark_circle(size=70).encode(
-        x=alt.X("x", title="Activity level (000 units)"),
-        y=alt.Y("y", title="Total cost (£000)"),
-        tooltip=["x", "y"],
-    )
-
-    line = alt.Chart(line_df).mark_line(color="orange").encode(
-        x="x",
-        y="y",
-    )
-
-    point = alt.Chart(point_df).mark_circle(
-        size=160, color="red"
-    ).encode(
-        x="x",
-        y="y",
-    )
-
-    st.altair_chart(
-        (scatter + line + point).interactive(),
-        use_container_width=True,
-    )
-
-    st.caption(f"Regression model: **y = {a:.2f} + {b:.2f}x**")
-
-# ====================================================
-# TAB 2 — DATA TABLE
-# ====================================================
-with tabs[1]:
-    st.subheader("Data table")
+    st.subheader("Input")
 
     uploaded = st.file_uploader("Upload CSV (columns: x, y)", type=["csv"])
     if uploaded is not None:
@@ -197,17 +137,22 @@ with tabs[1]:
         use_container_width=True,
         hide_index=True,
         column_config={
-            "x": st.column_config.NumberColumn("x (000 units)", step=1),
-            "y": st.column_config.NumberColumn("y (£000)", step=1),
+            "x": st.column_config.NumberColumn("Activity (x)", step=1),
+            "y": st.column_config.NumberColumn("Cost (£000)", step=1),
         },
     )
 
     st.session_state.df = edited
 
+    st.caption(
+        "Edit the input data directly or upload a new dataset. "
+        "Ensure units remain consistent."
+    )
+
 # ====================================================
-# TAB 3 — CORRELATION & INTERPRETATION
+# TAB 2 — CORRELATION
 # ====================================================
-with tabs[2]:
+with tabs[1]:
     st.subheader("Correlation & interpretation")
 
     df = clean_xy(st.session_state.df)
@@ -226,62 +171,101 @@ with tabs[2]:
 
         The coefficient of determination (**r²**) indicates that approximately
         **{variance_pct:.1f}% of the variance in total cost (£y)** is explained by
-        changes in the activity level (**x**).
+        changes in activity (**x**).
 
-        This suggests a **strong linear relationship**, making the regression model
-        suitable for forecasting and budgeting purposes within the observed data range.
+        This represents a **strong linear relationship**, supporting the use of the
+        regression model for forecasting and budgeting within the relevant range.
         """
     )
 
-    with st.expander("Show calculations and formulas"):
-        st.markdown("### Regression formulas")
-
+    with st.expander("Show formulas"):
         st.latex(r"y = a + bx")
-
         st.latex(
             r"b = \frac{\sum (x - \bar{x})(y - \bar{y})}"
             r"{\sum (x - \bar{x})^2}"
         )
-
         st.latex(r"a = \bar{y} - b\bar{x}")
 
-        st.markdown("### Worked calculation table")
+# ====================================================
+# TAB 3 — OUTPUT
+# ====================================================
+with tabs[2]:
+    st.subheader("Output")
 
-        calc = df.copy()
-        calc["x̄"] = df["x"].mean()
-        calc["ȳ"] = df["y"].mean()
-        calc["(x − x̄)"] = calc["x"] - calc["x̄"]
-        calc["(y − ȳ)"] = calc["y"] - calc["ȳ"]
-        calc["(x − x̄)(y − ȳ)"] = calc["(x − x̄)"] * calc["(y − ȳ)"]
-        calc["(x − x̄)²"] = calc["(x − x̄)"] ** 2
+    df = clean_xy(st.session_state.df)
+    a, b, r, r2 = fit_regression(df)
 
-        st.dataframe(
-            calc[
-                [
-                    "x",
-                    "y",
-                    "(x − x̄)",
-                    "(y − ȳ)",
-                    "(x − x̄)(y − ȳ)",
-                    "(x − x̄)²",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
+    left, right = st.columns([1, 2], vertical_alignment="center")
+
+    with left:
+        st.markdown("**Activity**")
+        x_val = st.slider(
+            "",
+            min_value=0,
+            max_value=100,
+            value=50,
+            orientation="vertical",
         )
 
+    y_pred = a + b * float(x_val)
+
+    with right:
+        st.markdown("**Cost (dynamic)**")
         st.markdown(
             f"""
-            **Calculated coefficients**
-
-            - Intercept (a): **{a:.2f}**
-            - Slope (b): **{b:.2f}**
-            - Regression equation: **y = {a:.2f} + {b:.2f}x**
-            """
+            <div style="
+                font-size:2.3rem;
+                font-weight:700;
+                margin-top:10px;
+            ">
+                £{y_pred:,.0f}k
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
+        st.caption(f"Model input: x = {x_val}")
+
+    st.divider()
+
+    # Chart context
+    line_df = pd.DataFrame({"x": np.linspace(0, 100, 200)})
+    line_df["y"] = a + b * line_df["x"]
+
+    point_df = pd.DataFrame({"x": [x_val], "y": [y_pred]})
+
+    scatter = alt.Chart(df).mark_circle(size=70).encode(
+        x=alt.X("x", title="Activity (x)"),
+        y=alt.Y("y", title="Cost (£000)"),
+        tooltip=["x", "y"],
+    )
+
+    line = alt.Chart(line_df).mark_line(color="orange").encode(
+        x="x",
+        y="y",
+    )
+
+    point = alt.Chart(point_df).mark_circle(
+        size=180, color="red"
+    ).encode(
+        x="x",
+        y="y",
+        tooltip=[
+            alt.Tooltip("x:Q", title="Activity"),
+            alt.Tooltip("y:Q", title="Predicted cost (£000)", format=",.2f"),
+        ],
+    )
+
+    st.altair_chart(
+        scatter + line + point,
+        use_container_width=True,
+    )
+
+    st.caption(
+        f"Regression model: **y = {a:.2f} + {b:.2f}x** · r² = {r2:.2f}"
+    )
 
 st.divider()
 st.caption(
-    "Portfolio demo: operationalising the ACCA PM regression example into a mobile-ready predictive analytics app. "
-    "Currency shown in GBP (£)."
+    "Portfolio demo: linear regression applied to cost behaviour analysis. "
+    "Designed for mobile use and business decision-making."
 )
