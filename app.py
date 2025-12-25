@@ -1,12 +1,12 @@
-import io
 import numpy as np
 import pandas as pd
 import streamlit as st
+import altair as alt
 from scipy.stats import pearsonr
 
-# -----------------------------
-# App config (mobile-friendly)
-# -----------------------------
+# ----------------------------------------------------
+# App configuration (mobile-first)
+# ----------------------------------------------------
 st.set_page_config(
     page_title="Predictive Cost Model",
     page_icon="📈",
@@ -15,11 +15,37 @@ st.set_page_config(
 )
 
 st.title("📈 Predictive Cost Model")
-st.caption("A simple linear regression + correlation app (portfolio demo).")
 
-# -----------------------------
-# Helpers
-# -----------------------------
+# ----------------------------------------------------
+# Branding badge
+# ----------------------------------------------------
+st.markdown(
+    """
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span style="
+            background-color:#111827;
+            color:white;
+            padding:4px 10px;
+            border-radius:14px;
+            font-size:0.8rem;
+            font-weight:600;">
+            Placeholder & Co
+        </span>
+        <span style="font-size:0.8rem; color:#6b7280;">
+            Predictive analytics demo
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.caption(
+    "A mobile-friendly regression app based on the ACCA PM (F5) regression example."
+)
+
+# ----------------------------------------------------
+# Default ACCA dataset
+# ----------------------------------------------------
 DEFAULT_DF = pd.DataFrame(
     {
         "x": [15, 45, 25, 55, 30, 20, 35, 60],
@@ -27,62 +53,57 @@ DEFAULT_DF = pd.DataFrame(
     }
 )
 
+# ----------------------------------------------------
+# Helper functions
+# ----------------------------------------------------
 def clean_xy(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # Accept common column names; enforce x,y
     cols = {c.lower().strip(): c for c in df.columns}
     if "x" not in cols or "y" not in cols:
-        raise ValueError("CSV/table must contain columns named 'x' and 'y'.")
+        raise ValueError("Dataset must contain columns named 'x' and 'y'.")
     df = df.rename(columns={cols["x"]: "x", cols["y"]: "y"})[["x", "y"]]
     df["x"] = pd.to_numeric(df["x"], errors="coerce")
     df["y"] = pd.to_numeric(df["y"], errors="coerce")
     df = df.dropna().sort_values("x").reset_index(drop=True)
     if len(df) < 2:
-        raise ValueError("Need at least 2 valid (x, y) rows.")
+        raise ValueError("At least two (x, y) observations are required.")
     return df
 
+
 def fit_regression(df: pd.DataFrame):
-    """
-    Fits y = a + b x
-    Returns: a, b, r, r2
-    """
     x = df["x"].to_numpy(dtype=float)
     y = df["y"].to_numpy(dtype=float)
 
-    # OLS closed-form: b = cov(x,y)/var(x), a = ybar - b*xbar
-    xbar = x.mean()
-    ybar = y.mean()
-    b = np.sum((x - xbar) * (y - ybar)) / np.sum((x - xbar) ** 2)
-    a = ybar - b * xbar
+    x_bar = x.mean()
+    y_bar = y.mean()
+
+    b = np.sum((x - x_bar) * (y - y_bar)) / np.sum((x - x_bar) ** 2)
+    a = y_bar - b * x_bar
 
     r, _ = pearsonr(x, y)
-    r2 = r ** 2
+    r2 = r**2
+
     return a, b, r, r2
 
-def format_equation(a: float, b: float) -> str:
-    return f"y = {a:.2f} + {b:.2f}x"
 
-def to_csv_bytes(df: pd.DataFrame) -> bytes:
-    return df.to_csv(index=False).encode("utf-8")
-
-
-# -----------------------------
+# ----------------------------------------------------
 # Session state
-# -----------------------------
+# ----------------------------------------------------
 if "df" not in st.session_state:
     st.session_state.df = DEFAULT_DF.copy()
 
-# -----------------------------
-# Top actions
-# -----------------------------
+# ----------------------------------------------------
+# Controls
+# ----------------------------------------------------
 col1, col2 = st.columns(2)
 with col1:
     if st.button("Reset to ACCA example"):
         st.session_state.df = DEFAULT_DF.copy()
+
 with col2:
     st.download_button(
-        "Download current CSV",
-        data=to_csv_bytes(st.session_state.df),
+        "Download CSV",
+        data=st.session_state.df.to_csv(index=False),
         file_name="regression_data.csv",
         mime="text/csv",
         use_container_width=True,
@@ -92,62 +113,83 @@ st.divider()
 
 tabs = st.tabs(["Calculate", "Data table", "Correlation"])
 
-# -----------------------------
-# Tab 1: Calculate (mobile slider)
-# -----------------------------
+# ====================================================
+# TAB 1 — CALCULATE (live slider + Altair chart)
+# ====================================================
 with tabs[0]:
     st.subheader("Calculate")
-    st.write("Use the slider to choose an activity level **x** and read the predicted cost **y**.")
 
-    try:
-        df = clean_xy(st.session_state.df)
-        a, b, r, r2 = fit_regression(df)
+    df = clean_xy(st.session_state.df)
+    a, b, r, r2 = fit_regression(df)
 
-        xmin = float(df["x"].min())
-        xmax = float(df["x"].max())
+    x_min = float(df["x"].min())
+    x_max = float(df["x"].max())
 
-        # Step: choose a sensible increment for phone-scrolling
-        # If data are integers, default to 1; otherwise 0.1
-        step = 1.0 if np.allclose(df["x"] % 1, 0) else 0.1
+    step = 1.0 if np.allclose(df["x"] % 1, 0) else 0.1
 
-        x_val = st.slider(
-            "Activity level x (000 units)",
-            min_value=xmin,
-            max_value=xmax,
-            value=float(np.median(df["x"])),
-            step=step,
-        )
+    x_val = st.slider(
+        "Activity level x (000 units)",
+        min_value=x_min,
+        max_value=x_max,
+        value=float(df["x"].median()),
+        step=step,
+    )
 
-        y_pred = a + b * x_val
+    y_pred = a + b * x_val
 
-        st.metric("Predicted total cost y ($000)", f"{y_pred:,.2f}")
+    st.metric("Predicted total cost y ($000)", f"{y_pred:,.2f}")
 
-        # Nice extra: show nearest actual observation (if any)
-        df["abs_diff"] = (df["x"] - x_val).abs()
-        nearest = df.sort_values("abs_diff").iloc[0]
-        st.caption(
-            f"Model: **{format_equation(a, b)}** · "
-            f"Nearest actual point: x={nearest['x']:.0f}, y={nearest['y']:.0f}"
-        )
+    # -----------------------------
+    # Altair interactive chart
+    # -----------------------------
+    scatter_df = df.copy()
 
-    except Exception as e:
-        st.error(str(e))
+    line_df = pd.DataFrame(
+        {"x": np.linspace(x_min, x_max, 200)}
+    )
+    line_df["y"] = a + b * line_df["x"]
 
-# -----------------------------
-# Tab 2: Data table (edit/upload)
-# -----------------------------
+    point_df = pd.DataFrame({"x": [x_val], "y": [y_pred]})
+
+    scatter = alt.Chart(scatter_df).mark_circle(size=70).encode(
+        x=alt.X("x", title="Activity level (000 units)"),
+        y=alt.Y("y", title="Total cost ($000)"),
+        tooltip=["x", "y"],
+    )
+
+    line = alt.Chart(line_df).mark_line(color="orange").encode(
+        x="x",
+        y="y",
+    )
+
+    point = alt.Chart(point_df).mark_circle(
+        size=160, color="red"
+    ).encode(
+        x="x",
+        y="y",
+    )
+
+    st.altair_chart(
+        (scatter + line + point).interactive(),
+        use_container_width=True,
+    )
+
+    st.caption(f"Regression model: **y = {a:.2f} + {b:.2f}x**")
+
+# ====================================================
+# TAB 2 — DATA TABLE (edit / upload)
+# ====================================================
 with tabs[1]:
     st.subheader("Data table")
-    st.write("Edit the table directly, or upload a new CSV with columns **x** and **y**.")
 
-    uploaded = st.file_uploader("Upload CSV", type=["csv"])
+    uploaded = st.file_uploader("Upload CSV (columns: x, y)", type=["csv"])
     if uploaded is not None:
         try:
             up_df = pd.read_csv(uploaded)
             st.session_state.df = clean_xy(up_df)
-            st.success("CSV loaded.")
+            st.success("CSV loaded successfully.")
         except Exception as e:
-            st.error(f"Could not load CSV: {e}")
+            st.error(str(e))
 
     edited = st.data_editor(
         st.session_state.df,
@@ -160,54 +202,76 @@ with tabs[1]:
         },
     )
 
-    # Persist edits
     st.session_state.df = edited
 
-    st.caption("Tip: keep units consistent (e.g., x in thousands, y in thousands).")
-
-# -----------------------------
-# Tab 3: Correlation + plot
-# -----------------------------
+# ====================================================
+# TAB 3 — CORRELATION + FORMULAS
+# ====================================================
 with tabs[2]:
-    st.subheader("Correlation & model quality")
+    st.subheader("Correlation & calculations")
 
-    try:
-        df = clean_xy(st.session_state.df)
-        a, b, r, r2 = fit_regression(df)
+    df = clean_xy(st.session_state.df)
+    a, b, r, r2 = fit_regression(df)
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Correlation (r)", f"{r:.3f}")
-        c2.metric("Coefficient of determination (r²)", f"{r2:.3f}")
-        c3.metric("Regression line", format_equation(a, b))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Correlation (r)", f"{r:.3f}")
+    c2.metric("r²", f"{r2:.3f}")
+    c3.metric("Regression", f"y = {a:.2f} + {b:.2f}x")
 
-        st.write(
-            "Interpretation: **r** indicates strength/direction of a linear relationship; "
-            "**r²** estimates how much of the variation in **y** is explained by **x**."
+    st.write(
+        "Correlation (**r**) measures the strength of the linear relationship. "
+        "**r²** estimates the proportion of variation in **y** explained by **x**."
+    )
+
+    with st.expander("Show calculations and formulas"):
+        st.markdown("### Regression formulas")
+
+        st.latex(r"y = a + bx")
+
+        st.latex(
+            r"b = \frac{\sum (x - \bar{x})(y - \bar{y})}"
+            r"{\sum (x - \bar{x})^2}"
         )
 
-        # Simple scatter + fitted line
-        plot_df = df.copy()
-        x_line = np.linspace(plot_df["x"].min(), plot_df["x"].max(), 200)
-        y_line = a + b * x_line
+        st.latex(r"a = \bar{y} - b\bar{x}")
 
-        st.line_chart(
-            pd.DataFrame({"y_line": y_line}, index=x_line),
-            height=220,
+        st.markdown("### Worked calculation table")
+
+        calc = df.copy()
+        calc["x̄"] = df["x"].mean()
+        calc["ȳ"] = df["y"].mean()
+        calc["(x − x̄)"] = calc["x"] - calc["x̄"]
+        calc["(y − ȳ)"] = calc["y"] - calc["ȳ"]
+        calc["(x − x̄)(y − ȳ)"] = calc["(x − x̄)"] * calc["(y − ȳ)"]
+        calc["(x − x̄)²"] = calc["(x − x̄)"] ** 2
+
+        st.dataframe(
+            calc[
+                [
+                    "x",
+                    "y",
+                    "(x − x̄)",
+                    "(y − ȳ)",
+                    "(x − x̄)(y − ȳ)",
+                    "(x − x̄)²",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
         )
-        st.scatter_chart(plot_df, x="x", y="y", height=220)
 
-        with st.expander("Show calculations table (x, y, xy, x², y²)"):
-            calc = plot_df.copy()
-            calc["xy"] = calc["x"] * calc["y"]
-            calc["x2"] = calc["x"] ** 2
-            calc["y2"] = calc["y"] ** 2
-            st.dataframe(calc, use_container_width=True, hide_index=True)
+        st.markdown(
+            f"""
+            **Calculated coefficients**
 
-    except Exception as e:
-        st.error(str(e))
+            - Intercept (a): **{a:.2f}**
+            - Slope (b): **{b:.2f}**
+            - Regression equation: **y = {a:.2f} + {b:.2f}x**
+            """
+        )
 
 st.divider()
 st.caption(
-    "Portfolio note: This app replicates the ACCA PM/F5 regression example and allows the dataset to be edited or replaced. "
-    "For the ACCA dataset, the published results are y = 208.90 + 9.1x, r = 0.965, r² = 0.931."
+    "Portfolio demo: operationalising the ACCA PM regression example into a mobile-ready predictive analytics app. "
+    "Designed for transparency, editability, and business deployment."
 )
