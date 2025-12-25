@@ -44,7 +44,7 @@ st.caption(
 )
 
 # ----------------------------------------------------
-# Default dataset
+# Default ACCA dataset
 # ----------------------------------------------------
 DEFAULT_DF = pd.DataFrame(
     {
@@ -54,7 +54,7 @@ DEFAULT_DF = pd.DataFrame(
 )
 
 # ----------------------------------------------------
-# Helpers
+# Helper functions
 # ----------------------------------------------------
 def clean_xy(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -93,7 +93,7 @@ if "df" not in st.session_state:
     st.session_state.df = DEFAULT_DF.copy()
 
 # ----------------------------------------------------
-# Controls
+# Global controls
 # ----------------------------------------------------
 col1, col2 = st.columns(2)
 with col1:
@@ -117,7 +117,7 @@ st.divider()
 tabs = st.tabs(["Input", "Correlation", "Output"])
 
 # ====================================================
-# INPUT
+# TAB 1 — INPUT
 # ====================================================
 with tabs[0]:
     st.subheader("Input")
@@ -132,13 +132,18 @@ with tabs[0]:
         use_container_width=True,
         hide_index=True,
         column_config={
-            "x": st.column_config.NumberColumn("Activity (x)", step=1),
+            "x": st.column_config.NumberColumn("Activity (000’s units)", step=1),
             "y": st.column_config.NumberColumn("Cost (£000)", step=1),
         },
     )
 
+    st.caption(
+        "Edit the input data directly or upload a new dataset. "
+        "Ensure units remain consistent."
+    )
+
 # ====================================================
-# CORRELATION
+# TAB 2 — CORRELATION
 # ====================================================
 with tabs[1]:
     st.subheader("Correlation & interpretation")
@@ -146,20 +151,41 @@ with tabs[1]:
     df = clean_xy(st.session_state.df)
     a, b, r, r2 = fit_regression(df)
 
-    st.metric("Correlation (r)", f"{r:.3f}")
-    st.metric("Coefficient of determination (r²)", f"{r2:.3f}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Correlation (r)", f"{r:.3f}")
+    c2.metric("Coefficient of determination (r²)", f"{r2:.3f}")
+    c3.metric("Regression", f"y = {a:.2f} + {b:.2f}x")
+
+    variance_pct = r2 * 100
 
     st.write(
         f"""
         **Interpretation**
 
-        Approximately **{r2*100:.1f}% of the variance in cost** is explained by
-        changes in activity level, indicating a strong linear relationship.
+        The coefficient of determination (**r²**) indicates that approximately
+        **{variance_pct:.1f}% of the variance in total cost (£y)** is explained by
+        changes in activity (**x**).
+
+        This indicates a **strong linear relationship**, supporting the use of
+        linear regression for forecasting and budgeting decisions.
         """
     )
 
+    st.divider()
+
+    st.markdown("### Regression formulae")
+
+    st.latex(r"y = a + bx")
+
+    st.latex(
+        r"b = \frac{\sum (x - \bar{x})(y - \bar{y})}"
+        r"{\sum (x - \bar{x})^2}"
+    )
+
+    st.latex(r"a = \bar{y} - b\bar{x}")
+
 # ====================================================
-# OUTPUT
+# TAB 3 — OUTPUT
 # ====================================================
 with tabs[2]:
     st.subheader("Output")
@@ -170,13 +196,13 @@ with tabs[2]:
     left, right = st.columns([1, 2])
 
     with left:
-        st.markdown("**Activity (0–100)**")
+        st.markdown("**Activity (000’s units)**")
         x_val = st.slider("", min_value=0, max_value=100, value=50)
 
     y_pred = a + b * x_val
 
     with right:
-        st.markdown("**Cost (dynamic)**")
+        st.markdown("**Cost (forecast)**")
         st.markdown(
             f"<div style='font-size:2.3rem;font-weight:700;'>£{y_pred:,.0f}k</div>",
             unsafe_allow_html=True,
@@ -199,3 +225,9 @@ with tabs[2]:
     )
 
     st.caption(f"Regression model: y = {a:.2f} + {b:.2f}x")
+
+st.divider()
+st.caption(
+    "Portfolio demo: linear regression applied to cost behaviour analysis. "
+    "Designed for mobile use and business decision-making."
+)
