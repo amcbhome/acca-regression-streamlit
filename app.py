@@ -1,175 +1,214 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
-from regression.core import clean_xy, regression_stats, worked_table
-from viz.charts import regression_chart
+st.set_page_config(page_title="ACCA PM Regression Visualiser", layout="wide")
 
-DEFAULT_DF = pd.DataFrame(
-    {
-        "x": [15, 45, 25, 55, 30, 20, 35, 60],
-        "y": [300, 615, 470, 680, 520, 350, 590, 740],
-    }
+# -------------------------------------------------------
+# Title
+# -------------------------------------------------------
+
+st.title("Regression Analysis Visualised")
+st.subheader("ACCA Performance Management (PM) Educational Tool")
+
+# -------------------------------------------------------
+# Sidebar
+# -------------------------------------------------------
+
+section = st.sidebar.selectbox(
+    "Navigation",
+    [
+        "Introduction",
+        "Sample Data",
+        "Regression Calculation",
+        "Visualisation",
+        "Interpretation"
+    ]
 )
 
-st.set_page_config(
-    page_title="Regression Explorer",
-    page_icon="📈",
-    layout="centered",
-)
+# -------------------------------------------------------
+# Sample dataset
+# -------------------------------------------------------
 
-st.title("Regression Explorer")
-st.caption("An educational visual explanation of simple linear regression using the ACCA worked example.")
+data = {
+    "Activity": [100, 150, 200, 250, 300, 350],
+    "Cost": [2200, 2600, 3000, 3400, 3800, 4200]
+}
 
-if "df" not in st.session_state:
-    st.session_state.df = DEFAULT_DF.copy()
+df = pd.DataFrame(data)
 
-with st.sidebar:
-    st.header("Data controls")
-    if st.button("Reset to ACCA example", use_container_width=True):
-        st.session_state.df = DEFAULT_DF.copy()
+# -------------------------------------------------------
+# Regression calculation
+# -------------------------------------------------------
 
-    uploaded = st.file_uploader("Upload CSV with x and y columns", type=["csv"])
-    if uploaded is not None:
-        st.session_state.df = clean_xy(pd.read_csv(uploaded))
+x = df["Activity"]
+y = df["Cost"]
 
-tabs = st.tabs(["Concepts", "Data", "Worked Table", "Visualise", "Interpretation"])
+b, a = np.polyfit(x, y, 1)
 
-with tabs[0]:
-    st.subheader("What this app explains")
+predicted = a + b * x
+
+correlation = np.corrcoef(x, y)[0, 1]
+
+# -------------------------------------------------------
+# INTRODUCTION
+# -------------------------------------------------------
+
+if section == "Introduction":
+
+    st.header("Introduction")
+
     st.markdown(
-        """
-This app turns the ACCA regression example into a visual teaching tool.
+    """
+    Regression analysis is a statistical technique used to examine the relationship between two variables.  
+    In management accounting and business analytics it is commonly used to estimate **cost behaviour** and support forecasting.
 
-**Regression line**
-- We assume a straight-line relationship: **y = a + bx**
-- **a** is the fixed element (intercept)
-- **b** is the variable element (slope)
+    In the **ACCA Performance Management (PM)** syllabus, regression analysis is used to estimate the relationship between:
 
-**Correlation**
-- **r** measures the strength and direction of the linear relationship
-- Values close to **1** indicate strong positive correlation
-- Values close to **-1** indicate strong negative correlation
-- A value near **0** suggests little linear correlation
+    * an **activity level** (for example machine hours or units produced)
+    * the **total cost** associated with that activity.
 
-**Coefficient of determination**
-- **r²** shows how much of the variation in **y** is explained by **x**
-        """
-    )
-    st.info(
-        "Educational aim: move from formula → worked arithmetic → graph → forecasting meaning."
+    The objective is to determine a **cost equation** that can be used for planning and prediction.
+    """
     )
 
-with tabs[1]:
-    st.subheader("Input data")
-    st.write("Edit the ACCA dataset directly, or upload your own x/y CSV.")
-    st.session_state.df = st.data_editor(
-        st.session_state.df,
-        num_rows="dynamic",
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "x": st.column_config.NumberColumn("Activity (x)", step=1.0),
-            "y": st.column_config.NumberColumn("Cost (y)", step=1.0),
-        },
+    st.latex("y = a + bx")
+
+    st.markdown(
+    """
+    Where:
+
+    * **y** = total cost (dependent variable)  
+    * **x** = activity level (independent variable)  
+    * **a** = fixed cost element  
+    * **b** = variable cost per unit of activity  
+
+    This equation allows management accountants to estimate future costs based on expected activity levels.
+    """
     )
 
-    st.download_button(
-        "Download current dataset as CSV",
-        data=st.session_state.df.to_csv(index=False),
-        file_name="regression_data.csv",
-        mime="text/csv",
-        use_container_width=True,
+    st.subheader("Importance of Correlation")
+
+    st.markdown(
+    """
+    A key part of regression analysis is evaluating the **strength of the relationship between the variables**.
+
+    This is measured using the **correlation coefficient (r)**.
+    """
     )
 
-with tabs[2]:
-    st.subheader("Worked table")
-    df = clean_xy(st.session_state.df)
-    stats = regression_stats(df)
-    table = worked_table(df)
+    st.latex("-1 \\leq r \\leq 1")
 
-    st.markdown("### Regression summary")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Equation", f"y = {stats['a']:.2f} + {stats['b']:.2f}x")
-    c2.metric("r", f"{stats['r']:.3f}")
-    c3.metric("r²", f"{stats['r2']:.3f}")
+    st.markdown(
+    """
+    Interpretation of correlation strength:
 
-    st.markdown("### Per-observation arithmetic")
-    st.dataframe(
-        table.style.format(
-            {
-                "x": "{:.2f}",
-                "y": "{:.2f}",
-                "xy": "{:.2f}",
-                "x²": "{:.2f}",
-                "y²": "{:.2f}",
-                "x̄": "{:.2f}",
-                "ȳ": "{:.2f}",
-                "x - x̄": "{:.2f}",
-                "y - ȳ": "{:.2f}",
-                "(x - x̄)(y - ȳ)": "{:.2f}",
-                "(x - x̄)²": "{:.2f}",
-                "ŷ = a + bx": "{:.2f}",
-                "Residual": "{:.2f}",
-            }
-        ),
-        use_container_width=True,
+    | Correlation (r) | Interpretation |
+    |---|---|
+    | 0 to ±0.3 | Weak relationship |
+    | ±0.3 to ±0.7 | Moderate relationship |
+    | ±0.7 to ±1.0 | Strong relationship |
+
+    In the context of **ACCA PM**, a strong correlation suggests that the regression equation is likely to provide a **reliable estimate of cost behaviour**.
+
+    If correlation is weak, other factors may be influencing costs and the regression model should be interpreted with caution.
+
+    The purpose of this application is to demonstrate these ideas visually.
+    """
     )
 
-    st.markdown("### Totals and formula ingredients")
-    st.write(f"Σx = {stats['sum_x']:.2f}")
-    st.write(f"Σy = {stats['sum_y']:.2f}")
-    st.write(f"Σxy = {stats['sum_xy']:.2f}")
-    st.write(f"Σx² = {stats['sum_x2']:.2f}")
-    st.write(f"Σy² = {stats['sum_y2']:.2f}")
+# -------------------------------------------------------
+# DATA
+# -------------------------------------------------------
 
-    st.markdown("### Formulae")
-    st.latex(r"y = a + bx")
-    st.latex(r"b = \frac{\sum (x - \bar{x})(y - \bar{y})}{\sum (x - \bar{x})^2}")
-    st.latex(r"a = \bar{y} - b\bar{x}")
-    st.latex(r"r = \frac{\sum (x - \bar{x})(y - \bar{y})}{\sqrt{\sum (x - \bar{x})^2 \sum (y - \bar{y})^2}}")
+elif section == "Sample Data":
 
-with tabs[3]:
-    st.subheader("Visualise the fitted line")
-    df = clean_xy(st.session_state.df)
-    stats = regression_stats(df)
+    st.header("Sample Dataset")
 
-    x_min = int(df["x"].min())
-    x_max = int(df["x"].max())
-    x_guess = st.slider("Choose an activity level for forecast", min_value=x_min, max_value=max(x_max, x_min + 1), value=int(df["x"].mean()))
-    y_guess = stats["a"] + stats["b"] * x_guess
-
-    c1, c2 = st.columns(2)
-    c1.metric("Chosen x", f"{x_guess}")
-    c2.metric("Predicted y", f"{y_guess:.2f}")
-
-    st.altair_chart(
-        regression_chart(df, stats["a"], stats["b"], x_point=x_guess),
-        use_container_width=True,
+    st.write(
+        "The dataset represents an example relationship between **activity level** and **cost**."
     )
 
-    st.caption(f"Forecast point shown on the same regression line: y = {stats['a']:.2f} + {stats['b']:.2f}x")
+    st.dataframe(df)
 
-with tabs[4]:
-    st.subheader("Interpretation")
-    df = clean_xy(st.session_state.df)
-    stats = regression_stats(df)
+# -------------------------------------------------------
+# REGRESSION CALCULATION
+# -------------------------------------------------------
 
-    st.write(f"The fitted line is **y = {stats['a']:.2f} + {stats['b']:.2f}x**.")
-    st.write(f"The correlation coefficient is **r = {stats['r']:.3f}**.")
-    st.write(f"The coefficient of determination is **r² = {stats['r2']:.3f}**, meaning about **{stats['r2']*100:.1f}%** of the variation in y is explained by x in this dataset.")
+elif section == "Regression Calculation":
 
-    if stats["r"] > 0.8:
-        st.success("This suggests a strong positive linear relationship.")
-    elif stats["r"] > 0.4:
-        st.warning("This suggests a moderate positive linear relationship.")
+    st.header("Regression Calculation")
+
+    st.markdown("Using the **least squares method**, we estimate the regression equation.")
+
+    st.write("Variable cost per unit (b):", round(b, 2))
+    st.write("Fixed cost (a):", round(a, 2))
+
+    st.latex(f"y = {round(a,2)} + {round(b,2)}x")
+
+# -------------------------------------------------------
+# VISUALISATION
+# -------------------------------------------------------
+
+elif section == "Visualisation":
+
+    st.header("Regression Line")
+
+    fig, ax = plt.subplots()
+
+    ax.scatter(x, y, label="Observed Data")
+
+    ax.plot(x, predicted, label="Regression Line")
+
+    ax.set_xlabel("Activity Level")
+    ax.set_ylabel("Cost")
+
+    ax.legend()
+
+    st.pyplot(fig)
+
+# -------------------------------------------------------
+# INTERPRETATION
+# -------------------------------------------------------
+
+elif section == "Interpretation":
+
+    st.header("Model Interpretation")
+
+    st.write("Correlation coefficient (r):", round(correlation, 3))
+
+    if abs(correlation) < 0.3:
+        interpretation = "Weak relationship"
+    elif abs(correlation) < 0.7:
+        interpretation = "Moderate relationship"
     else:
-        st.info("This suggests a weak linear relationship.")
+        interpretation = "Strong relationship"
+
+    st.write("Interpretation:", interpretation)
 
     st.markdown(
-        """
-### Caution for learners
-- Regression supports forecasting, but does **not** prove causation.
-- A strong relationship in past data does not guarantee the future will behave the same way.
-- Business judgement still matters.
-        """
+    """
+    In cost analysis, a **strong correlation** suggests that activity is a major driver of cost.
+
+    This means the regression equation can be used with greater confidence when forecasting costs or preparing budgets.
+
+    If correlation is weak, management accountants should investigate whether other variables influence cost behaviour.
+    """
     )
+
+# -------------------------------------------------------
+# Reference
+# -------------------------------------------------------
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+"""
+Source  
+
+ACCA Performance Management Technical Article  
+Regression Analysis  
+
+https://www.accaglobal.com/gb/en/student/exam-support-resources/fundamentals-exams-study-resources/f5/technical-articles/regression.html
+"""
+)
