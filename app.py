@@ -1,248 +1,258 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import altair as alt
 
-st.set_page_config(page_title="ACCA PM Regression Visualiser", layout="wide")
+st.set_page_config(page_title="ACCA Regression Visualiser", layout="wide")
 
-st.title("Regression Analysis Visualised")
-st.subheader("ACCA Performance Management (PM) Educational Tool")
+st.title("ACCA Regression Visualiser")
+st.subheader("Activity Level vs Total Cost")
 
-# Sidebar navigation
-section = st.sidebar.selectbox(
-    "Navigation",
-    [
-        "Introduction",
-        "Sample Data",
-        "Regression Calculation",
-        "Visualisation",
-        "Interpretation"
-    ]
+st.markdown("""
+This application demonstrates **simple linear regression** using the method described in the ACCA Performance Management technical article.
+
+Regression estimates the relationship between:
+
+- **x** = Activity level (000 units)
+- **y** = Total production cost ($000)
+
+The regression model is:
+
+y = a + bx
+
+Where:
+
+• **b** = regression coefficient (slope)  
+• **a** = intercept  
+
+Source:  
+https://www.accaglobal.com/gb/en/student/exam-support-resources/fundamentals-exams-study-resources/f5/technical-articles/regression.html
+""")
+
+# ----------------------------------------------------
+# ACCA dataset
+# ----------------------------------------------------
+
+data = pd.DataFrame({
+    "Activity (000 units)": [15,45,25,55,30,20,35,60],
+    "Total Cost ($000)": [300,615,470,680,520,350,590,740]
+})
+
+x = data["Activity (000 units)"]
+y = data["Total Cost ($000)"]
+
+# ----------------------------------------------------
+# Regression calculations
+# ----------------------------------------------------
+
+n = len(data)
+
+sum_x = x.sum()
+sum_y = y.sum()
+sum_xy = (x*y).sum()
+sum_x2 = (x**2).sum()
+sum_y2 = (y**2).sum()
+
+x_bar = x.mean()
+y_bar = y.mean()
+
+b = (n*sum_xy - sum_x*sum_y) / (n*sum_x2 - sum_x**2)
+a = y_bar - b*x_bar
+
+# Pearson correlation
+r = (n*sum_xy - sum_x*sum_y) / np.sqrt(
+    (n*sum_x2 - sum_x**2)*(n*sum_y2 - sum_y**2)
 )
 
-# Sample dataset
-data = {
-    "Activity": [100,150,200,250,300,350],
-    "Cost": [2200,2600,3000,3400,3800,4200]
-}
+# predictions
+y_pred = a + b*x
 
-df = pd.DataFrame(data)
+tabs = st.tabs([
+    "Introduction",
+    "Dataset",
+    "Manual Calculation",
+    "Prediction",
+    "Regression Plot"
+])
 
-# ---------------------------------------------------------
+# ----------------------------------------------------
 # INTRODUCTION
-# ---------------------------------------------------------
+# ----------------------------------------------------
 
-if section == "Introduction":
+with tabs[0]:
 
     st.header("Introduction")
 
     st.markdown("""
-Regression analysis examines the relationship between two variables.
+Regression analysis estimates the **relationship between two variables**.
 
-In **ACCA Performance Management (PM)**, regression is used to estimate how **costs behave as activity changes**.
+In this example:
 
-The objective is to identify the **cost equation**:
+- **Activity level** is the independent variable (x)
+- **Total production cost** is the dependent variable (y)
 
+The regression equation:
+
+y = a + bx
+
+allows us to estimate cost for a given level of activity.
+
+The strength of the relationship between the variables is measured using the **Pearson correlation coefficient (r)**.
+
+Values of r range from:
+
+- **+1** perfect positive relationship  
+- **0** no relationship  
+- **−1** perfect negative relationship
+
+A strong correlation indicates that the regression line provides a useful predictive model.
 """)
 
-    st.latex("y = a + bx")
-
-    st.markdown("""
-Where:
-
-- **y** = total cost  
-- **x** = activity level  
-- **a** = fixed cost  
-- **b** = variable cost per unit  
-
-Once the equation is estimated, it can be used to **predict future costs** and support planning decisions.
-""")
-
-    st.subheader("Strength of Correlation")
-
-    st.markdown("""
-Regression must also evaluate the **strength of the relationship between the variables**.
-
-This is measured using the **Pearson correlation coefficient (r)**.
-""")
-
-    st.latex("-1 \\le r \\le 1")
-
-    st.markdown("""
-Interpretation:
-
-| r value | Meaning |
-|------|------|
-| 0 – ±0.3 | Weak relationship |
-| ±0.3 – ±0.7 | Moderate relationship |
-| ±0.7 – ±1.0 | Strong relationship |
-
-A **strong correlation** indicates that activity is likely to be a major driver of cost.
-
-A **weak correlation** suggests other factors may influence cost behaviour.
-""")
-
-# ---------------------------------------------------------
+# ----------------------------------------------------
 # DATA
-# ---------------------------------------------------------
+# ----------------------------------------------------
 
-elif section == "Sample Data":
+with tabs[1]:
 
-    st.header("Sample Dataset")
+    st.header("Dataset")
 
-    st.markdown("""
-Example dataset representing the relationship between **activity level** and **cost**.
-""")
+    st.dataframe(data)
 
-    st.dataframe(df)
+    st.write("Number of observations:", n)
 
-# ---------------------------------------------------------
-# REGRESSION CALCULATION
-# ---------------------------------------------------------
+# ----------------------------------------------------
+# MANUAL CALCULATION
+# ----------------------------------------------------
 
-elif section == "Regression Calculation":
+with tabs[2]:
 
     st.header("Manual Regression Calculation")
 
-    st.markdown("""
-Regression can be calculated manually using a table of intermediate values.
-""")
+    calc = data.copy()
 
-    calc = df.copy()
-
-    calc["x"] = calc["Activity"]
-    calc["y"] = calc["Cost"]
-
-    calc["x²"] = calc["x"]**2
-    calc["y²"] = calc["y"]**2
-    calc["xy"] = calc["x"] * calc["y"]
-
-    calc = calc[["x","y","x²","y²","xy"]]
+    calc["x²"] = x**2
+    calc["y²"] = y**2
+    calc["xy"] = x*y
 
     st.subheader("Calculation Table")
 
     st.dataframe(calc)
 
-    n = len(calc)
+    st.subheader("Totals")
 
-    sum_x = calc["x"].sum()
-    sum_y = calc["y"].sum()
-    sum_x2 = calc["x²"].sum()
-    sum_y2 = calc["y²"].sum()
-    sum_xy = calc["xy"].sum()
-
-    st.subheader("Column Totals")
-
-    totals = pd.DataFrame(
-        {
-            "Total":[sum_x,sum_y,sum_x2,sum_y2,sum_xy]
-        },
-        index=["Σx","Σy","Σx²","Σy²","Σxy"]
-    )
+    totals = pd.DataFrame({
+        "Value":[
+            n,
+            sum_x,
+            sum_y,
+            sum_x2,
+            sum_y2,
+            sum_xy
+        ]
+    }, index=[
+        "n",
+        "Σx",
+        "Σy",
+        "Σx²",
+        "Σy²",
+        "Σxy"
+    ])
 
     st.table(totals)
 
-    # Regression coefficients
-    b = (n*sum_xy - sum_x*sum_y) / (n*sum_x2 - sum_x**2)
-    a = (sum_y - b*sum_x) / n
+    st.subheader("Slope (b)")
+
+    st.latex(r"""
+    b =
+    \frac{n\sum xy - (\sum x)(\sum y)}
+    {n\sum x^2 - (\sum x)^2}
+    """)
+
+    st.latex(fr"""
+    b =
+    \frac{{{n}({sum_xy}) - ({sum_x})({sum_y})}}
+    {{{n}({sum_x2}) - ({sum_x})^2}}
+    """)
+
+    st.write("b =", round(b,3))
+
+    st.subheader("Intercept (a)")
+
+    st.latex(r"""
+    a = \bar{y} - b\bar{x}
+    """)
+
+    st.latex(fr"""
+    a =
+    {round(y_bar,2)} -
+    ({round(b,3)})( {round(x_bar,2)} )
+    """)
+
+    st.write("a =", round(a,3))
+
+    st.subheader("Pearson Correlation")
+
+    st.latex(r"""
+    r =
+    \frac{n\sum xy - (\sum x)(\sum y)}
+    {\sqrt{(n\sum x^2-(\sum x)^2)(n\sum y^2-(\sum y)^2)}}
+    """)
+
+    st.write("r =", round(r,3))
 
     st.subheader("Regression Equation")
 
-    st.latex("y = a + bx")
-
-    st.write("Variable cost per unit (b):", round(b,2))
-    st.write("Fixed cost (a):", round(a,2))
-
-    st.latex(f"y = {round(a,2)} + {round(b,2)}x")
-
-    # Pearson correlation
-    r = (n*sum_xy - sum_x*sum_y) / np.sqrt((n*sum_x2 - sum_x**2)*(n*sum_y2 - sum_y**2))
-
-    st.subheader("Pearson Correlation Coefficient")
-
-    st.latex(
-        r"r = \frac{n\Sigma xy - \Sigma x \Sigma y}{\sqrt{(n\Sigma x^2 - (\Sigma x)^2)(n\Sigma y^2 - (\Sigma y)^2)}}"
+    st.success(
+        f"Total Cost = {round(a,2)} + {round(b,2)} × Activity"
     )
 
-    st.write("Correlation coefficient (r):", round(r,3))
+# ----------------------------------------------------
+# PREDICTION
+# ----------------------------------------------------
 
-    # Predict x from y
-    st.subheader("Calculate Activity Level from Target Cost")
+with tabs[3]:
 
-    target_y = st.number_input("Enter target cost (y)", value=3500)
+    st.header("Cost Prediction")
 
-    predicted_x = (target_y - a)/b
+    activity = st.slider(
+        "Activity level (000 units)",
+        min_value=10,
+        max_value=80,
+        value=40
+    )
 
-    st.write("Required activity level (x):", round(predicted_x,2))
+    prediction = a + b*activity
 
-# ---------------------------------------------------------
-# VISUALISATION
-# ---------------------------------------------------------
+    st.write(
+        f"Estimated total cost: **{round(prediction,2)} ($000)**"
+    )
 
-elif section == "Visualisation":
+# ----------------------------------------------------
+# REGRESSION PLOT
+# ----------------------------------------------------
 
-    st.header("Regression Visualisation")
+with tabs[4]:
 
-    x = df["Activity"]
-    y = df["Cost"]
+    st.header("Regression Plot")
 
-    b, a = np.polyfit(x,y,1)
+    plot_df = pd.DataFrame({
+        "Activity":x,
+        "Cost":y,
+        "Regression":y_pred
+    })
 
-    predicted = a + b*x
+    scatter = alt.Chart(plot_df).mark_circle(size=80).encode(
+        x="Activity",
+        y="Cost"
+    )
 
-    fig, ax = plt.subplots()
+    line = alt.Chart(plot_df).mark_line(color="red").encode(
+        x="Activity",
+        y="Regression"
+    )
 
-    ax.scatter(x,y,label="Observed Data")
-
-    ax.plot(x,predicted,label="Regression Line")
-
-    ax.set_xlabel("Activity Level")
-    ax.set_ylabel("Cost")
-
-    ax.legend()
-
-    st.pyplot(fig)
-
-# ---------------------------------------------------------
-# INTERPRETATION
-# ---------------------------------------------------------
-
-elif section == "Interpretation":
-
-    st.header("Correlation Interpretation")
-
-    x = df["Activity"]
-    y = df["Cost"]
-
-    r = np.corrcoef(x,y)[0,1]
-
-    st.write("Correlation coefficient (r):", round(r,3))
-
-    if abs(r) < 0.3:
-        text = "Weak relationship"
-    elif abs(r) < 0.7:
-        text = "Moderate relationship"
-    else:
-        text = "Strong relationship"
-
-    st.write("Interpretation:", text)
+    st.altair_chart(scatter + line, use_container_width=True)
 
     st.markdown("""
-A strong correlation suggests that activity level is a **key cost driver**.
-
-A weak correlation indicates that **additional explanatory variables may be required** for a reliable model.
-""")
-
-# ---------------------------------------------------------
-# Reference
-# ---------------------------------------------------------
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("""
-Source:
-
-ACCA Performance Management Technical Article  
-Regression Analysis  
-
-https://www.accaglobal.com/gb/en/student/exam-support-resources/fundamentals-exams-study-resources/f5/technical-articles/regression.html
+The red line represents the **least-squares regression line** fitted to the data.
 """)
